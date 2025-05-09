@@ -30,6 +30,7 @@ class BusMaintenanceSimulation:
         self.repair_queue_lengths = []
         self.inspection_busy_time = 0
         self.repair_busy_time = 0
+        self.last_time = 0  # Track last update time for busy calculations
 
     def generate_interarrival_time(self) -> float:
         return random.expovariate(1.0 / self.mean_interarrival_time)
@@ -50,6 +51,13 @@ class BusMaintenanceSimulation:
             # Update statistics
             self.inspection_queue_lengths.append(len(self.inspection_queue))
             self.repair_queue_lengths.append(len(self.repair_queue))
+            
+            # Update busy times
+            time_diff = self.current_time - self.last_time
+            if self.inspection_station_busy:
+                self.inspection_busy_time += time_diff
+            self.repair_busy_time += sum(1 for busy in self.repair_stations_busy if busy) * time_diff
+            self.last_time = self.current_time
             
             # Check for next event
             events = []
@@ -113,11 +121,6 @@ class BusMaintenanceSimulation:
                         bus.repair_end_time = self.current_time + repair_time
                         self.repair_stations_busy[i] = True
                         self.repair_queue_delays.append(bus.repair_start_time - bus.inspection_end_time)
-                        
-            # Update busy times
-            if self.inspection_station_busy:
-                self.inspection_busy_time += self.current_time - self.current_time
-            self.repair_busy_time += sum(1 for busy in self.repair_stations_busy if busy) * (self.current_time - self.current_time)
 
     def get_statistics(self) -> dict:
         return {
@@ -130,7 +133,8 @@ class BusMaintenanceSimulation:
         }
 
 def find_max_arrival_rate():
-    mean_interarrival_times = np.linspace(0.5, 2.0, 31)  # Test from 0.5 to 2.0 hours
+    # Test from 0.5 to 3.0 hours (2 to 0.33 buses per hour)
+    mean_interarrival_times = np.linspace(0.5, 3.0, 50)
     results = []
     
     for mean_time in mean_interarrival_times:
@@ -138,12 +142,21 @@ def find_max_arrival_rate():
         sim.run_simulation()
         stats = sim.get_statistics()
         
-        # Check if system is stable (queues don't grow unbounded)
-        if stats['avg_inspection_queue_length'] < 100 and stats['avg_repair_queue_length'] < 100:
+        # Check if system is stable:
+        # 1. Queue lengths should be reasonable
+        # 2. Utilization should be under 85%
+        if (stats['avg_inspection_queue_length'] < 2 and 
+            stats['avg_repair_queue_length'] < 2 and
+            stats['inspection_station_utilization'] < 0.85 and
+            stats['repair_station_utilization'] < 0.85):
             results.append((mean_time, stats))
         else:
-            break
+            if results:  # Only break if we have at least one stable result
+                break
             
+    if not results:
+        return None
+        
     return results
 
 if __name__ == "__main__":
@@ -165,4 +178,6 @@ if __name__ == "__main__":
     if results:
         max_rate = results[-1][0]
         print(f"Maximum sustainable arrival rate: {1/max_rate:.2f} buses per hour")
-        print(f"(Minimum mean interarrival time: {max_rate:.2f} hours)") 
+        print(f"(Minimum mean interarrival time: {max_rate:.2f} hours)")
+    else:
+        print("Could not determine maximum arrival rate") 
