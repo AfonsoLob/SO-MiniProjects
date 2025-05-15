@@ -61,16 +61,3 @@ Example:
 ```bash
 python projectile_simulation/projectile.py --x0 0 --z0 100 --vx0 20 --vz0 0 --u 0.1 --m 1 --g 9.81 --dt 0.01 --t_final 10 --method compare
 ```
-
-When using the 'compare' method, the program will show the maximum differences between the Forward Euler and Runge-Kutta methods for position and velocity components.
-
-## Project Structure
-
-```
-.
-├── README.md
-├── bus_simulation/
-│   └── bus_maintenance.py
-└── projectile_simulation/
-    └── projectile.py
-```
